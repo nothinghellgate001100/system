@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Admin & Order Management</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 50px;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            background-color: #5a3d5c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        .btn:hover {
+            background-color: #4a2d4c;
+        }
+        .order-card {
+            display: none;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .order-card.show {
+            display: block;
+        }
+        .balance-card, .stats-card, .notification {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .notification {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .balance-info {
+            font-size: 18px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Admin Panel Card -->
+    <div class="card">
+        <h2>Admin Panel</h2>
+        <div class="form-group">
+            <label for="deposit-amount">Set Deposit Amount (USDT):</label>
+            <input type="number" id="deposit-amount" class="form-control" placeholder="Enter amount">
+        </div>
+        <button class="btn" onclick="setDepositAmount()">Set Deposit</button>
+        <button class="btn" onclick="grantAccess()">Grant Access</button>
+        <button class="btn" onclick="revokeAccess()">Revoke Access</button>
+        <button class="btn btn-danger" onclick="resetProgram()">Reset Program</button>
+    </div>
+
+    <!-- Balance and Stats Section -->
+    <div class="card balance-card">
+        <h2>Account Balance</h2>
+        <h3 id="account-balance">0.00 USDT</h3>
+    </div>
+    <div class="card stats-card">
+        <div class="row text-center">
+            <div class="col">
+                <p><strong id="todays-times">0</strong><br>Today's Times</p>
+            </div>
+            <div class="col">
+                <p><strong id="todays-commission">0.00</strong> USDT<br>Today's Commission</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification for Insufficient Balance -->
+    <div id="notification" class="card notification" style="display: none;">
+        <h4>Notification</h4>
+        <p id="notification-message"></p>
+    </div>
+
+    <!-- Increase Balance Section -->
+    <div class="card">
+        <h2>Increase Account Balance</h2>
+        <div class="form-group">
+            <label for="increase-amount">Enter Amount to Increase (USDT):</label>
+            <input type="number" id="increase-amount" class="form-control" placeholder="Enter amount">
+        </div>
+        <button class="btn" onclick="increaseAccountBalance()">Increase Balance</button>
+    </div>
+
+    <!-- Grab Order Section -->
+    <div class="card">
+        <h2>Order Management</h2>
+        <div class="row">
+            <div class="col">
+                <div class="balance-info">
+                    <strong>Deposited Money:</strong> <span id="deposited-money">0.00 USDT</span>
+                </div>
+            </div>
+            <div class="col">
+                <div class="balance-info">
+                    <strong>Total Commission:</strong> <span id="total-commission">0.00 USDT</span>
+                </div>
+            </div>
+        </div>
+        <button class="btn" onclick="grabOrder()">Grab Order</button>
+    </div>
+
+    <!-- Order Details Card -->
+    <div id="order-container" class="card order-card">
+        <h4>Order Details</h4>
+        <hr>
+        <div class="order-details">
+            <p><strong>Product:</strong> <span id="order-product"></span></p>
+            <p><strong>Price:</strong> <span id="order-price"></span> USDT</p>
+            <p><strong>Quantity:</strong> <span id="order-quantity"></span></p>
+            <p><strong>Order Amount:</strong> <span id="order-amount"></span> USDT</p>
+            <p><strong>Commissions:</strong> <span id="order-commission"></span> USDT</p>
+        </div>
+        <div class="text-center">
+            <button class="btn" onclick="submitOrder()">Submit Order</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let orders = [];
+    let currentOrderIndex = 0;
+    let totalCommission = 0;
+    let totalAmount = 0;
+    let accessGranted = false;
+    let depositAmount = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize fake orders
+        for (let i = 1; i <= 20; i++) {
+            const price = (Math.random() * 100).toFixed(2);
+            const quantity = Math.floor(Math.random() * 10) + 1;
+            const orderAmount = (price * quantity).toFixed(2);
+            const commissions = (orderAmount * 0.04).toFixed(2);
+
+            orders.push({
+                id: i,
+                product: "Sample Product " + i,
+                price: price,
+                quantity: quantity,
+                orderAmount: orderAmount,
+                commissions: commissions,
+            });
+        }
+
+        // Fetch deposit amount and access status from local storage
+        depositAmount = parseFloat(localStorage.getItem('depositAmount')) || 0;
+        accessGranted = JSON.parse(localStorage.getItem('accessGranted') || 'false');
+
+        // Update deposit amount on the page
+        document.getElementById('account-balance').innerText = depositAmount.toFixed(2) + ' USDT';
+
+        // Update deposited money and total commission
+        updateBalanceInfo();
+    });
+
+    function updateBalanceInfo() {
+        document.getElementById('deposited-money').innerText = depositAmount.toFixed(2) + ' USDT';
+        document.getElementById('total-commission').innerText = totalCommission.toFixed(2) + ' USDT';
+    }
+
+    function setDepositAmount() {
+        const amount = parseFloat(document.getElementById('deposit-amount').value);
+        if (isNaN(amount) || amount < 0) {
+            alert('Please enter a valid amount');
+            return;
+        }
+
+        localStorage.setItem('depositAmount', amount.toFixed(2));
+        alert('Deposit amount set to ' + amount.toFixed(2) + ' USDT');
+        depositAmount = amount;
+        document.getElementById('account-balance').innerText = depositAmount.toFixed(2) + ' USDT';
+        updateBalanceInfo();
+    }
+
+    function grantAccess() {
+        localStorage.setItem('accessGranted', 'true');
+        alert('Access granted');
+        accessGranted = true;
+    }
+
+    function revokeAccess() {
+        localStorage.setItem('accessGranted', 'false');
+        alert('Access revoked');
+        accessGranted = false;
+    }
+
+    function increaseAccountBalance() {
+        const amount = parseFloat(document.getElementById('increase-amount').value);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid amount to increase');
+            return;
+        }
+
+        depositAmount += amount;
+        localStorage.setItem('depositAmount', depositAmount.toFixed(2));
+        document.getElementById('account-balance').innerText = depositAmount.toFixed(2) + ' USDT';
+        updateBalanceInfo();
+        alert(`Account balance increased by ${amount.toFixed(2)} USDT`);
+    }
+
+    function grabOrder() {
+        if (!accessGranted) {
+            alert('Please grant access first!');
+            return;
+        }
+
+        if (currentOrderIndex < orders.length) {
+            const order = orders[currentOrderIndex];
+            document.getElementById('order-product').innerText = order.product;
+            document.getElementById('order-price').innerText = order.price;
+            document.getElementById('order-quantity').innerText = order.quantity;
+            document.getElementById('order-amount').innerText = order.orderAmount;
+            document.getElementById('order-commission').innerText = order.commissions;
+
+            document.getElementById('order-container').classList.add('show');
+        } else {
+            alert('No more orders to grab!');
+        }
+    }
+
+    function submitOrder() {
+        if (currentOrderIndex < orders.length) {
+            const order = orders[currentOrderIndex];
+            const orderAmount = parseFloat(order.orderAmount);
+
+            if (orderAmount > depositAmount) {
+                document.getElementById('notification-message').innerText = `Insufficient balance. Please deposit at least ${orderAmount.toFixed(2)} USDT to submit this order.`;
+                document.getElementById('notification').style.display = 'block';
+                return;
+            }
+
+            currentOrderIndex++;
+            totalCommission += parseFloat(order.commissions);
+            totalAmount += orderAmount;
+            depositAmount -= orderAmount;
+
+            document.getElementById('account-balance').innerText = depositAmount.toFixed(2) + ' USDT';
+            updateBalanceInfo();
+
+            document.getElementById('order-container').classList.remove('show');
+            document.getElementById('notification').style.display = 'none';
+        } else {
+            alert('No more orders to submit!');
+        }
+    }
+
+    function resetProgram() {
+        // Clear localStorage
+        localStorage.removeItem('depositAmount');
+        localStorage.removeItem('accessGranted');
+
+        // Reset variables
+        currentOrderIndex = 0;
+        totalCommission = 0;
+        totalAmount = 0;
+        accessGranted = false;
+        depositAmount = 0;
+
+        // Update UI
+        document.getElementById('account-balance').innerText = depositAmount.toFixed(2) + ' USDT';
+        document.getElementById('todays-times').innerText = '0';
+        document.getElementById('todays-commission').innerText = '0.00 USDT';
+        document.getElementById('notification').style.display = 'none';
+        document.getElementById('order-container').classList.remove('show');
+        updateBalanceInfo();
+
+        alert('Program reset successful');
+    }
+</script>
+</body>
+</html>
